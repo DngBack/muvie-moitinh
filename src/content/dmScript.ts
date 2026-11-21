@@ -40,7 +40,7 @@ export const DM_STEPS: Step[] = [
         'Đối chiếu vật phẩm: 6 thư mời, 6 kịch bản, 6 tập hồ sơ vụ án, 6 “Thư của Hoan Hoan”, thẻ A1–A6, B1–B7 (B7 khổ A4), C1–C15 (C11–C15 khổ A4), D1.',
         'Cửa hàng chuẩn bị: bảng trắng lớn (hoặc 2 bảng), giấy A4, bút màu nước, máy in (hoặc tiệm in gần), một cành hoa hồng, nến, loa.',
         'Thiết bị phát video: máy chiếu > TV > máy tính bảng > điện thoại.',
-        'Mã QR: dán QR nhân vật vào trang đầu mỗi kịch bản và QR “Thư của Hoan Hoan” (tab Lượt chơi → In mã QR).',
+        'Mã QR: dán QR nhân vật vào trang đầu mỗi kịch bản và QR “Thư của Hoan Hoan” (trang DM → In mã QR).',
         'Tạo lượt chơi mới trên app để có mã khóa lời mời; có thể viết sẵn mã lên bảng trắng.',
       ] },
       { t: 'action', text: 'Đặt kịch bản theo sơ đồ chỗ ngồi, mỗi cuốn kèm một đèn nến đang TẮT. Phòng tối hoàn toàn, giữa bàn đặt một đèn nến làm nguồn sáng.' },

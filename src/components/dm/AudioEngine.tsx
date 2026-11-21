@@ -105,7 +105,7 @@ export function AudioProvider({ urlOf, children }: { urlOf: (key: string) => str
     if (cue.kind === 'bgm') {
       const el = bgmEl.current;
       if (!el) return;
-      if (!url) { setVoicePanel({ ...cue, script: [`Chưa có file cho “${cue.name}”. Vào tab Âm thanh để tải file lên.`] }); return; }
+      if (!url) { setVoicePanel({ ...cue, script: [`Chưa có file cho “${cue.name}” — hãy phát bài này từ thiết bị/loa của bạn.`] }); return; }
       const start = () => {
         el.src = url;
         el.currentTime = 0;
@@ -203,7 +203,7 @@ function VideoPanel({ cue, url, onClose, onPauseBgm }: { cue: Cue; url: string |
         <video ref={ref} src={url} controls autoPlay playsInline className="min-h-0 flex-1 bg-black" />
       ) : (
         <div className="flex flex-1 items-center justify-center px-8 text-center text-white/70">
-          Chưa tải video “Tin tức Giang Thành”. Vào tab Âm thanh → mục Video để tải lên (mp4).
+          Chưa có video “Tin tức Giang Thành” — hãy phát từ thiết bị của bạn.
         </div>
       )}
     </div>

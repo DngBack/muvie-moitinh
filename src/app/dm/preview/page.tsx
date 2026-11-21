@@ -16,7 +16,7 @@ import { DialoguePlayer, GlitchHeader } from '@/components/player/DialoguePlayer
 import { AnswerGate } from '@/components/player/AnswerGate';
 import { EndingCard } from '@/components/player/EndingCard';
 import { Scene } from '@/components/Scene';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { noopDmApi } from '@/lib/dmApi';
 import { ConfirmProvider } from '@/components/dm/Confirm';
 import { AudioProvider } from '@/components/dm/AudioEngine';
 import { StageControl } from '@/components/dm/StageControl';
@@ -24,21 +24,14 @@ import { ScriptPrompter } from '@/components/dm/ScriptPrompter';
 import { PlayersPanel } from '@/components/dm/PlayersPanel';
 import { DEFAULT_STAGE, type PlayerRow, type Room } from '@/lib/types';
 
-/** Client giả: mọi thao tác ghi đều không làm gì (chế độ demo). */
-const fakeClient = new Proxy({}, {
-  get: () => () => new Proxy(Promise.resolve({ data: null, error: null }), {
-    get: (t, k) => (k === 'then' ? t.then.bind(t) : () => fakeClient.from()),
-  }),
-}) as unknown as SupabaseClient & { from: () => unknown };
-
 function DmDemo({ view }: { view: string }) {
   const now = new Date().toISOString();
   const [room, setRoom] = useState<Room>({
-    id: 'demo', invite_code: '85967996', dm_id: 'demo', name: 'Demo', created_at: now, closed_at: null, ending: null, script_step: 3,
+    id: 'demo', invite_code: '85967996', name: 'Demo', created_at: now, closed_at: null, ending: null, script_step: 3,
     stage: { ...DEFAULT_STAGE, chat: true, i1: true, i2: true },
   });
   const players: PlayerRow[] = CHARACTERS.map((c) => ({
-    id: String(c.slot), room_id: 'demo', slot: c.slot, auth_uid: c.slot === 4 ? null : 'u' + c.slot, joined_at: now,
+    id: String(c.slot), room_id: 'demo', slot: c.slot, holder: c.slot === 4 ? null : 'u' + c.slot, joined_at: now,
     last_seen: c.slot === 3 ? '2000-01-01T00:00:00Z' : now,
     progress: { name_ok: true, name_attempts: c.slot % 3, i1_done: true, i2_done: c.slot < 3, l2_ok: c.slot < 5, sec_1: true, sec_2: c.slot < 4 },
   }));
@@ -47,9 +40,9 @@ function DmDemo({ view }: { view: string }) {
       <AudioProvider urlOf={() => null}>
         <div className="mx-auto min-h-[100dvh] max-w-2xl bg-white text-[var(--dm-ink)]">
           <header className="border-b border-[var(--dm-line)] px-3 py-2 text-[15px]">‹ Thiên Hy Niên 2.0 – Mã khóa lời mời: <b className="font-mono text-[var(--dm-pink)]">{room.invite_code}</b></header>
-          {view === 'dmctl' && <StageControl client={fakeClient} room={room} players={players} setRoom={setRoom} />}
+          {view === 'dmctl' && <StageControl api={noopDmApi} room={room} players={players} setRoom={setRoom} />}
           {view === 'dmscript' && <ScriptPrompter room={room} step={room.script_step} onStep={(n) => setRoom({ ...room, script_step: n })} onOpen={() => {}} onLookup={() => {}} />}
-          {view === 'dmplayers' && <PlayersPanel client={fakeClient} room={room} players={players} />}
+          {view === 'dmplayers' && <PlayersPanel api={noopDmApi} dmKey="00000000-0000-0000-0000-000000000000" room={room} players={players} />}
         </div>
       </AudioProvider>
     </ConfirmProvider>
