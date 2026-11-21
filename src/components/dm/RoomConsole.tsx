@@ -3,7 +3,6 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useRoomSync } from '@/lib/useRoomSync';
-import { useAssets } from '@/lib/useAssets';
 import { cueById } from '@/content/audioCues';
 import { DM_STEPS } from '@/content/dmScript';
 import { isOnline, type Room } from '@/lib/types';
@@ -11,28 +10,26 @@ import { AudioProvider, useAudio } from './AudioEngine';
 import { ConfirmProvider } from './Confirm';
 import { StageControl, useStageOpener } from './StageControl';
 import { LookupPanel, ScriptPrompter } from './ScriptPrompter';
-import { AudioPanel } from './AudioPanel';
 import { PlayersPanel } from './PlayersPanel';
-import { DmShellMessage } from './useDmSession';
+import { DmShellMessage } from './DmShell';
+import type { DmApi } from '@/lib/dmApi';
 
-type Tab = 'control' | 'script' | 'audio' | 'lookup' | 'players';
+type Tab = 'control' | 'script' | 'lookup' | 'players';
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'control', label: 'Chủ trì', icon: '開' },
   { id: 'script', label: 'Kịch bản', icon: '📜' },
-  { id: 'audio', label: 'Âm thanh', icon: '♫' },
   { id: 'lookup', label: 'Tra cứu', icon: '🔍' },
   { id: 'players', label: 'Lượt chơi', icon: '⚏' },
 ];
 
-export function RoomConsole({ client, roomId }: { client: SupabaseClient; roomId: string }) {
+export function RoomConsole({ client, roomId, api, dmKey }: { client: SupabaseClient; roomId: string; api: DmApi; dmKey: string }) {
   const sync = useRoomSync(client, roomId, 8000);
-  const assets = useAssets(client);
 
   if (!sync.loaded) return <DmShellMessage title="Đang tải lượt chơi…" />;
   if (!sync.room) {
     return (
       <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 bg-white px-6 text-center">
-        <p className="font-semibold">Không tìm thấy lượt chơi này (hoặc không thuộc tài khoản của bạn).</p>
+        <p className="font-semibold">Không tìm thấy lượt chơi này (có thể đã bị xóa hoặc hết hạn).</p>
         <Link href="/dm" className="text-[var(--dm-pink)] underline">Về danh sách lượt chơi</Link>
       </div>
     );
@@ -40,28 +37,28 @@ export function RoomConsole({ client, roomId }: { client: SupabaseClient; roomId
 
   return (
     <ConfirmProvider>
-      <AudioProvider urlOf={assets.urlOf}>
-        <Console client={client} room={sync.room} players={sync.players} setRoom={(r) => sync.setRoom(r)} connected={sync.connected} assets={assets} />
+      <AudioProvider urlOf={() => null}>
+        <Console api={api} dmKey={dmKey} room={sync.room} players={sync.players} setRoom={(r) => sync.setRoom(r)} connected={sync.connected} />
       </AudioProvider>
     </ConfirmProvider>
   );
 }
 
 function Console({
-  client, room, players, setRoom, connected, assets,
+  api, dmKey, room, players, setRoom, connected,
 }: {
-  client: SupabaseClient;
+  api: DmApi;
+  dmKey: string;
   room: Room;
   players: ReturnType<typeof useRoomSync>['players'];
   setRoom: (r: Room) => void;
   connected: boolean;
-  assets: ReturnType<typeof useAssets>;
 }) {
   const [tab, setTabState] = useState<Tab>('control');
   const [lookupFocus, setLookupFocus] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const audio = useAudio();
-  const open = useStageOpener(client, room, players, setRoom);
+  const open = useStageOpener(api, room, players, setRoom);
 
   // Nhớ tab đang mở (theo thiết bị)
   useEffect(() => {
@@ -83,11 +80,11 @@ function Console({
   const setStep = useCallback(async (n: number) => {
     const step = Math.min(Math.max(n, 0), DM_STEPS.length - 1);
     setRoom({ ...room, script_step: step });
-    await client.from('rooms').update({ script_step: step }).eq('id', room.id);
-  }, [client, room, setRoom]);
+    await api.updateRoom({ script_step: step });
+  }, [api, room, setRoom]);
 
-  const onlineCount = players.filter((p) => p.auth_uid && isOnline(p.last_seen)).length;
-  const joined = players.filter((p) => p.auth_uid).length;
+  const onlineCount = players.filter((p) => p.holder && isOnline(p.last_seen)).length;
+  const joined = players.filter((p) => p.holder).length;
   const nowPlaying = [audio.bgm, audio.sfx].filter(Boolean).map((id) => cueById(id!)?.name).join(' · ');
 
   async function copyCode() {
@@ -110,13 +107,12 @@ function Console({
       {room.closed_at && <p className="bg-gray-100 px-4 py-2 text-center text-sm text-gray-600">Lượt chơi này đã đóng.</p>}
 
       <main>
-        {tab === 'control' && <StageControl client={client} room={room} players={players} setRoom={setRoom} />}
+        {tab === 'control' && <StageControl api={api} room={room} players={players} setRoom={setRoom} />}
         {tab === 'script' && (
           <ScriptPrompter room={room} step={room.script_step} onStep={setStep} onOpen={open} onLookup={(id) => { setLookupFocus(id); setTab('lookup'); }} />
         )}
-        {tab === 'audio' && <AudioPanel client={client} assets={assets.rows} reload={assets.reload} />}
         {tab === 'lookup' && <LookupPanel focus={lookupFocus} />}
-        {tab === 'players' && <PlayersPanel client={client} room={room} players={players} />}
+        {tab === 'players' && <PlayersPanel api={api} dmKey={dmKey} room={room} players={players} />}
       </main>
 
       {nowPlaying && (

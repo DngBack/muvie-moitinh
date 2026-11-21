@@ -10,7 +10,6 @@ export type IfaceKey = (typeof IFACE_KEYS)[number];
 export interface Room {
   id: string;
   invite_code: string;
-  dm_id: string;
   name: string | null;
   stage: Stage;
   ending: Ending | null;
@@ -45,7 +44,7 @@ export interface PlayerRow {
   id: string;
   room_id: string;
   slot: Slot;
-  auth_uid: string | null;
+  holder: string | null; // mã thiết bị đang giữ ghế (null = trống)
   joined_at: string;
   last_seen: string;
   progress: Progress;

@@ -1,5 +1,5 @@
 'use client';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { DmApi } from '@/lib/dmApi';
 import { useCallback } from 'react';
 import { useConfirm } from './Confirm';
 import { charBySlot } from '@/content/characters';
@@ -16,11 +16,11 @@ const doneKey: Record<StageKey, string> = {
 };
 
 /** Hook dùng chung (Điều khiển + Kịch bản dẫn): mở một giai đoạn, có cảnh báo "chưa hoàn thành". */
-export function useStageOpener(client: SupabaseClient, room: Room, players: PlayerRow[], setRoom: (r: Room) => void) {
+export function useStageOpener(api: DmApi, room: Room, players: PlayerRow[], setRoom: (r: Room) => void) {
   const ask = useConfirm();
   return useCallback(async (key: StageKey) => {
     if (room.stage[key]) return;
-    const joined = players.filter((p) => p.auth_uid);
+    const joined = players.filter((p) => p.holder);
     const notDone = key === 'chat' ? [] : joined.filter((p) => !prerequisiteDone(key, p.progress ?? {}));
     if (notDone.length) {
       const ok = await ask({
@@ -35,17 +35,17 @@ export function useStageOpener(client: SupabaseClient, room: Room, players: Play
     }
     const stage = { ...room.stage, [key]: true };
     setRoom({ ...room, stage });
-    const { error } = await client.from('rooms').update({ stage }).eq('id', room.id);
-    if (error) await ask({ title: 'Lỗi', message: error.message, ok: 'OK' });
-  }, [ask, client, room, players, setRoom]);
+    const error = await api.updateRoom({ stage });
+    if (error) await ask({ title: 'Lỗi', message: error, ok: 'OK' });
+  }, [ask, api, room, players, setRoom]);
 }
 
 export function StageControl({
-  client, room, players, setRoom,
-}: { client: SupabaseClient; room: Room; players: PlayerRow[]; setRoom: (r: Room) => void }) {
+  api, room, players, setRoom,
+}: { api: DmApi; room: Room; players: PlayerRow[]; setRoom: (r: Room) => void }) {
   const ask = useConfirm();
-  const open = useStageOpener(client, room, players, setRoom);
-  const joined = players.filter((p) => p.auth_uid);
+  const open = useStageOpener(api, room, players, setRoom);
+  const joined = players.filter((p) => p.holder);
   const nextKey = STAGE_ORDER.find((k) => !room.stage[k]);
   const lastOpened = [...STAGE_ORDER].reverse().find((k) => room.stage[k]);
 
@@ -55,7 +55,7 @@ export function StageControl({
     if (!ok) return;
     const stage = { ...room.stage, [key]: false };
     setRoom({ ...room, stage });
-    await client.from('rooms').update({ stage }).eq('id', room.id);
+    await api.updateRoom({ stage });
   }
 
   async function setEnding(e: Ending | null) {
@@ -69,7 +69,7 @@ export function StageControl({
     });
     if (!ok) return;
     setRoom({ ...room, ending: e });
-    await client.from('rooms').update({ ending: e }).eq('id', room.id);
+    await api.updateRoom({ ending: e });
   }
 
   const doneCount = (k: StageKey) => joined.filter((p) => !!(p.progress as Record<string, unknown>)[doneKey[k]]).length;

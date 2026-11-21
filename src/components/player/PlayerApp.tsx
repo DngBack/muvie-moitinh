@@ -1,8 +1,8 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { playerClient, supabaseConfigured } from '@/lib/supabase';
+import { getClient, supabaseConfigured } from '@/lib/supabase';
+import { clearSeat, lastCode, readSeat, writeSeat, type Seat } from '@/lib/keys';
 import { useRoomSync } from '@/lib/useRoomSync';
-import { useAssets } from '@/lib/useAssets';
 import { isOnline, type Progress, type StageKey } from '@/lib/types';
 import { charBySlot } from '@/content/characters';
 import { FINALE, INTERFACES, type IfaceDef } from '@/content/interfaces';
@@ -16,13 +16,10 @@ import { AnswerGate } from './AnswerGate';
 import { EndingCard } from './EndingCard';
 import { Scene } from '../Scene';
 
-const CODE_KEY = 'mtdm-last-code';
-const SCENE_ASSET: Record<string, string> = {
-  path: 'bg_path', school: 'bg_school', garden: 'bg_garden', room: 'bg_room', field: 'bg_field', void: 'bg_void',
-};
-
-function lsGet(k: string) { try { return localStorage.getItem(k) ?? undefined; } catch { return undefined; } }
-function lsSet(k: string, v: string) { try { localStorage.setItem(k, v); } catch { /* bỏ qua */ } }
+/** Lượt chơi quá 16 giờ coi như đã kết thúc (thiết bị còn nhớ ghế cũ). */
+const STALE_MS = 16 * 3600_000;
+// Chưa có ảnh nền thật → dùng hình vẽ mô phỏng. Khi có file: trả về URL ảnh theo key (bg_chat, bg_path, …).
+const urlOf = (_key: string): string | null => null;
 
 type Phase = 'boot' | 'pick' | 'key' | 'in' | 'error';
 
@@ -48,63 +45,47 @@ function chime() {
 }
 
 export function PlayerApp({ routeSlot }: { routeSlot: number | null }) {
-  const client = useMemo(() => (supabaseConfigured ? playerClient() : null), []);
+  const client = useMemo(() => (supabaseConfigured ? getClient() : null), []);
   const [phase, setPhase] = useState<Phase>('boot');
-  const [uid, setUid] = useState<string | null>(null);
+  const [seat, setSeat] = useState<Seat | null>(null);
   const [slot, setSlot] = useState<number | null>(routeSlot);
-  const [roomId, setRoomId] = useState<string | null>(null);
+  const roomId = seat?.roomId ?? null;
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // ---------- Khởi động: phiên ẩn danh + tìm ghế đang giữ ----------
+  // ---------- Khởi động: tìm ghế đã lưu trên thiết bị (không cần đăng nhập) ----------
   useEffect(() => {
     if (!client) { setPhase('error'); setErr('Chưa cấu hình Supabase (NEXT_PUBLIC_SUPABASE_URL / ANON_KEY).'); return; }
-    let cancelled = false;
-    (async () => {
-      let { data: { session } } = await client.auth.getSession();
-      if (!session) {
-        const r = await client.auth.signInAnonymously();
-        if (r.error || !r.data.session) {
-          if (!cancelled) { setPhase('error'); setErr('Không đăng nhập được: ' + (r.error?.message ?? '') + ' — DM cần bật “Anonymous sign-ins” trong Supabase.'); }
-          return;
-        }
-        session = r.data.session;
-      }
-      const me = session.user.id;
-      if (cancelled) return;
-      setUid(me);
-      const { data } = await client
-        .from('room_players')
-        .select('room_id, slot, last_seen, rooms!inner(closed_at)')
-        .eq('auth_uid', me)
-        .is('rooms.closed_at', null)
-        .order('last_seen', { ascending: false });
-      if (cancelled) return;
-      const seats = (data ?? []) as { room_id: string; slot: number }[];
-      const seat = routeSlot ? seats.find((s) => s.slot === routeSlot) : seats[0];
-      if (seat) { setSlot(seat.slot); setRoomId(seat.room_id); setPhase('in'); }
-      else setPhase(routeSlot ? 'key' : 'pick');
-    })();
-    return () => { cancelled = true; };
+    const saved = readSeat(routeSlot);
+    if (saved) { setSeat(saved); setSlot(saved.slot); setPhase('in'); }
+    else setPhase(routeSlot ? 'key' : 'pick');
   }, [client, routeSlot]);
+
+  const leave = useCallback((message: string | null) => {
+    if (slot) clearSeat(slot);
+    setSeat(null);
+    setErr(message);
+    setPhase(slot ? 'key' : 'pick');
+  }, [slot]);
 
   const join = useCallback(async (code: string) => {
     if (!client || !slot) return;
     setBusy(true); setErr(null);
-    const { data, error } = await client.rpc('join_room', { p_code: code, p_slot: slot });
+    const { data, error } = await client.rpc('join_room', { p_code: code.trim(), p_slot: slot });
     setBusy(false);
     if (error) {
       setErr(error.message.includes('INVALID_CODE') ? 'Mã khóa không đúng hoặc lượt chơi đã đóng. Hãy hỏi lại người dẫn trò.' : 'Không vào được: ' + error.message);
       return;
     }
-    lsSet(CODE_KEY, code);
-    setRoomId((data as { room_id: string }).room_id);
+    const d = data as { room_id: string; slot: number; holder: string; key: string };
+    const next: Seat = { roomId: d.room_id, slot: d.slot, holder: d.holder, key: d.key, code: code.trim() };
+    writeSeat(next);
+    setSeat(next);
     setPhase('in');
   }, [client, slot]);
 
   // ---------- Đồng bộ phòng ----------
   const { room, players, loaded, refresh } = useRoomSync(phase === 'in' ? client : null, roomId);
-  const { urlOf } = useAssets(phase === 'in' ? client : null);
   const me = players.find((p) => p.slot === slot);
 
   // Tiến độ: server + ghi đè cục bộ (lạc quan); hàng đợi gửi lại khi mất mạng
@@ -119,12 +100,12 @@ export function PlayerApp({ routeSlot }: { routeSlot: number | null }) {
   const progress: Progress = useMemo(() => ({ ...(me?.progress ?? {}), ...ov }), [me, ov]);
 
   const flush = useCallback(async () => {
-    if (!client || !roomId) return;
+    if (!client || !seat) return;
     const patch = pending.current;
     pending.current = {};
-    const { error } = await client.rpc('save_progress', { p_room: roomId, p_patch: patch });
+    const { error } = await client.rpc('save_progress', { p_room: seat.roomId, p_slot: seat.slot, p_key: seat.key, p_patch: patch });
     if (error) pending.current = { ...patch, ...pending.current };
-  }, [client, roomId]);
+  }, [client, seat]);
 
   const save = useCallback((patch: Progress) => {
     setOv((o) => ({ ...o, ...patch }));
@@ -142,10 +123,10 @@ export function PlayerApp({ routeSlot }: { routeSlot: number | null }) {
 
   // Bị thiết bị khác chiếm ghế / DM giải phóng ghế / phòng đóng
   useEffect(() => {
-    if (phase !== 'in' || !loaded || !uid) return;
-    if (!room) { setErr('Lượt chơi không còn tồn tại. Hãy nhập lại mã khóa.'); setPhase('key'); return; }
-    if (me && me.auth_uid !== uid) { setErr('Vai này vừa được đăng nhập trên thiết bị khác. Nhập lại mã khóa để lấy lại.'); setPhase('key'); }
-  }, [phase, loaded, room, me, uid]);
+    if (phase !== 'in' || !loaded || !seat) return;
+    if (!room) { leave('Lượt chơi không còn tồn tại. Hãy nhập mã khóa mới.'); return; }
+    if (me && me.holder !== seat.holder) leave(me.holder ? 'Vai này vừa được đăng nhập trên thiết bị khác. Nhập lại mã khóa để lấy lại.' : 'Người dẫn trò đã giải phóng thiết bị. Nhập lại mã khóa để vào lại (tiến độ vẫn giữ nguyên).');
+  }, [phase, loaded, room, me, seat, leave]);
 
   // Âm báo khi DM mở giai đoạn mới
   const prevStage = useRef<string>('');
@@ -164,16 +145,20 @@ export function PlayerApp({ routeSlot }: { routeSlot: number | null }) {
   if (phase === 'boot') return <WaitingScreen title="Đang kết nối giao diện não–máy…" loading />;
   if (phase === 'pick') return <CharacterPicker onPick={(s) => { setSlot(s); setPhase('key'); }} />;
   if (phase === 'key' && slot) {
-    return <InviteKeyScreen character={charBySlot(slot)} initialCode={lsGet(CODE_KEY)} error={err} busy={busy} onSubmit={join} />;
+    return <InviteKeyScreen character={charBySlot(slot)} initialCode={lastCode()} error={err} busy={busy} onSubmit={join} />;
   }
   if (!slot || !room || !me) return <WaitingScreen title="Đang tải lượt chơi…" loading />;
 
-  if (room.closed_at) {
-    return <WaitingScreen title="Lượt chơi đã kết thúc" sub="Cảm ơn bạn đã trải nghiệm 《Mối Tình Đẫm Máu》." scene="void" />;
+  if (room.closed_at || Date.now() - new Date(room.created_at).getTime() > STALE_MS) {
+    return (
+      <WaitingScreen title="Lượt chơi đã kết thúc" sub="Cảm ơn bạn đã trải nghiệm 《Mối Tình Đẫm Máu》." scene="void">
+        <button onClick={() => leave(null)} className="mt-8 text-xs text-white/60 underline">Vào lượt chơi khác</button>
+      </WaitingScreen>
+    );
   }
 
   const st = room.stage;
-  const online = players.filter((p) => p.auth_uid && isOnline(p.last_seen)).length;
+  const online = players.filter((p) => p.holder && isOnline(p.last_seen)).length;
 
   // Kết cục
   if (room.ending) {
@@ -196,7 +181,7 @@ export function PlayerApp({ routeSlot }: { routeSlot: number | null }) {
         key={'replay-' + replay}
         lines={def.lines(slot)}
         scene={def.scene}
-        bgUrl={urlOf(SCENE_ASSET[def.scene])}
+        bgUrl={urlOf(`bg_${def.scene}`)}
         header={def.header}
         title={`Xem lại · Giao diện ${def.no}`}
         onDone={() => setReplay(null)}
@@ -210,7 +195,7 @@ export function PlayerApp({ routeSlot }: { routeSlot: number | null }) {
   const current = seq.find((d) => st[d.key as StageKey] && !doneOf(d.key));
   const anyOpen = seq.some((d) => st[d.key as StageKey]);
 
-  if (current) return <IfaceView def={current} slot={slot} progress={progress} save={save} bgUrl={urlOf(SCENE_ASSET[current.scene])} onlineCount={online} chatBg={urlOf('bg_chat')} />;
+  if (current) return <IfaceView def={current} slot={slot} progress={progress} save={save} bgUrl={urlOf(`bg_${current.scene}`)} onlineCount={online} chatBg={urlOf('bg_chat')} />;
 
   if (anyOpen) {
     const done = seq.filter((d) => st[d.key as StageKey] && doneOf(d.key));
@@ -240,7 +225,7 @@ export function PlayerApp({ routeSlot }: { routeSlot: number | null }) {
     return (
       <WaitingScreen
         title="Đã kết nối. Chờ mở phòng chat…"
-        sub={`Bạn là [${charBySlot(slot).nick}]. Phòng chat sẽ tự mở khi cả 6 người đã vào (đã vào: ${players.filter((p) => p.auth_uid).length}/6). Đừng lật kịch bản nhé!`}
+        sub={`Bạn là [${charBySlot(slot).nick}]. Phòng chat sẽ tự mở khi cả 6 người đã vào (đã vào: ${players.filter((p) => p.holder).length}/6). Đừng lật kịch bản nhé!`}
         loading
       />
     );
