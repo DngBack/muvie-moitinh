@@ -230,3 +230,4 @@ out/
 *.tsbuildinfo
 next-env.d.ts
 .env*.local
+!src/lib/
