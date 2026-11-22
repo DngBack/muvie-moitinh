@@ -8,7 +8,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { CHARACTERS, charBySlot } from '@/content/characters';
 import { FINALE, INTERFACES } from '@/content/interfaces';
 import type { Progress } from '@/lib/types';
-import { InviteKeyScreen } from '@/components/player/InviteKeyScreen';
+import { JoinScreen } from '@/components/player/JoinScreen';
 import { ChatRoom } from '@/components/player/ChatRoom';
 import { DiaryLoginL1, DiaryLoginL2 } from '@/components/player/DiaryModal';
 import { WaitingScreen } from '@/components/player/WaitingScreen';
@@ -69,7 +69,7 @@ function Preview() {
 
   let screen: React.ReactNode = null;
   const iface = [...INTERFACES, FINALE].find((d) => d.key === s);
-  if (s === 'login') screen = <InviteKeyScreen character={charBySlot(slot)} onSubmit={noop} />;
+  if (s === 'login') screen = <JoinScreen initialSlot={slot} onSubmit={noop} />;
   else if (s === 'chat') screen = <ChatRoom slot={slot} onlineCount={6} onOpenDiary={() => go('l1')} />;
   else if (s === 'l1') screen = <ChatRoom slot={slot} onlineCount={6} instant onOpenDiary={noop}><DiaryLoginL1 slot={slot} progress={prog} save={save} onClose={noop} /></ChatRoom>;
   else if (s === 'wait') screen = <WaitingScreen title="Đang tải nhật ký…" loading sub="Nhật ký đã được tải về cuốn kịch bản trước mặt bạn. Hãy làm theo hướng dẫn của người dẫn trò." />;

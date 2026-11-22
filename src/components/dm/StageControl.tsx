@@ -2,6 +2,7 @@
 import type { DmApi } from '@/lib/dmApi';
 import { useCallback } from 'react';
 import { useConfirm } from './Confirm';
+import { ShareRoom } from './ShareRoom';
 import { charBySlot } from '@/content/characters';
 import { ENDINGS } from '@/content/endings';
 import { prerequisiteDone, STAGE_ORDER, type Ending, type PlayerRow, type Room, type StageKey } from '@/lib/types';
@@ -100,6 +101,12 @@ export function StageControl({
 
   return (
     <div className="pb-6">
+      {!room.stage.chat && (
+        <div className="mx-3 mt-3">
+          <ShareRoom code={room.invite_code} />
+          <p className="mt-2 text-center text-xs text-[var(--dm-mute)]">Đã vào: {joined.length}/6 — phòng chat tự mở khi đủ 6 người.</p>
+        </div>
+      )}
       <div className="dm-bar mx-3 mt-3 flex items-center gap-2 rounded-md px-3 py-2.5 font-bold">
         <span aria-hidden>⚇</span> Điều khiển giai đoạn
       </div>

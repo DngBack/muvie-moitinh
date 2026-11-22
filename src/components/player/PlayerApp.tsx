@@ -6,8 +6,7 @@ import { useRoomSync } from '@/lib/useRoomSync';
 import { isOnline, type Progress, type StageKey } from '@/lib/types';
 import { charBySlot } from '@/content/characters';
 import { FINALE, INTERFACES, type IfaceDef } from '@/content/interfaces';
-import { InviteKeyScreen } from './InviteKeyScreen';
-import { CharacterPicker } from './CharacterPicker';
+import { JoinScreen } from './JoinScreen';
 import { WaitingScreen } from './WaitingScreen';
 import { ChatRoom } from './ChatRoom';
 import { DiaryLoginL1, DiaryLoginL2 } from './DiaryModal';
@@ -21,7 +20,7 @@ const STALE_MS = 16 * 3600_000;
 // Chưa có ảnh nền thật → dùng hình vẽ mô phỏng. Khi có file: trả về URL ảnh theo key (bg_chat, bg_path, …).
 const urlOf = (_key: string): string | null => null;
 
-type Phase = 'boot' | 'pick' | 'key' | 'in' | 'error';
+type Phase = 'boot' | 'join' | 'in' | 'error';
 
 /** Âm báo nhẹ khi có giai đoạn mới mở (sổ tay: nhắc người chơi bật âm thanh điện thoại). */
 function chime() {
@@ -52,26 +51,31 @@ export function PlayerApp({ routeSlot }: { routeSlot: number | null }) {
   const roomId = seat?.roomId ?? null;
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [linkCode, setLinkCode] = useState<string | undefined>(undefined);
 
   // ---------- Khởi động: tìm ghế đã lưu trên thiết bị (không cần đăng nhập) ----------
   useEffect(() => {
     if (!client) { setPhase('error'); setErr('Chưa cấu hình Supabase (NEXT_PUBLIC_SUPABASE_URL / ANON_KEY).'); return; }
+    // Link DM gửi có dạng /?code=12345678
+    const q = new URLSearchParams(window.location.search).get('code')?.replace(/\D/g, '').slice(0, 8);
+    if (q) setLinkCode(q);
     const saved = readSeat(routeSlot);
-    if (saved) { setSeat(saved); setSlot(saved.slot); setPhase('in'); }
-    else setPhase(routeSlot ? 'key' : 'pick');
+    if (saved && (!q || q === saved.code)) { setSeat(saved); setSlot(saved.slot); setPhase('in'); }
+    else setPhase('join');
   }, [client, routeSlot]);
 
   const leave = useCallback((message: string | null) => {
     if (slot) clearSeat(slot);
     setSeat(null);
     setErr(message);
-    setPhase(slot ? 'key' : 'pick');
+    setPhase('join');
   }, [slot]);
 
-  const join = useCallback(async (code: string) => {
-    if (!client || !slot) return;
+  const join = useCallback(async (code: string, pickSlot: number) => {
+    if (!client) return;
     setBusy(true); setErr(null);
-    const { data, error } = await client.rpc('join_room', { p_code: code.trim(), p_slot: slot });
+    setSlot(pickSlot);
+    const { data, error } = await client.rpc('join_room', { p_code: code.trim(), p_slot: pickSlot });
     setBusy(false);
     if (error) {
       setErr(error.message.includes('INVALID_CODE') ? 'Mã khóa không đúng hoặc lượt chơi đã đóng. Hãy hỏi lại người dẫn trò.' : 'Không vào được: ' + error.message);
@@ -82,7 +86,7 @@ export function PlayerApp({ routeSlot }: { routeSlot: number | null }) {
     writeSeat(next);
     setSeat(next);
     setPhase('in');
-  }, [client, slot]);
+  }, [client]);
 
   // ---------- Đồng bộ phòng ----------
   const { room, players, loaded, refresh } = useRoomSync(phase === 'in' ? client : null, roomId);
@@ -124,8 +128,8 @@ export function PlayerApp({ routeSlot }: { routeSlot: number | null }) {
   // Bị thiết bị khác chiếm ghế / DM giải phóng ghế / phòng đóng
   useEffect(() => {
     if (phase !== 'in' || !loaded || !seat) return;
-    if (!room) { leave('Lượt chơi không còn tồn tại. Hãy nhập mã khóa mới.'); return; }
-    if (me && me.holder !== seat.holder) leave(me.holder ? 'Vai này vừa được đăng nhập trên thiết bị khác. Nhập lại mã khóa để lấy lại.' : 'Người dẫn trò đã giải phóng thiết bị. Nhập lại mã khóa để vào lại (tiến độ vẫn giữ nguyên).');
+    if (!room) { leave('Lượt chơi không còn tồn tại. Hãy nhập mã phòng mới.'); return; }
+    if (me && me.holder !== seat.holder) leave(me.holder ? 'Vai này vừa được đăng nhập trên thiết bị khác. Nhập lại mã phòng và chọn vai để lấy lại.' : 'Người dẫn trò đã giải phóng thiết bị. Nhập lại mã phòng và chọn vai để vào lại (tiến độ vẫn giữ nguyên).');
   }, [phase, loaded, room, me, seat, leave]);
 
   // Âm báo khi DM mở giai đoạn mới
@@ -143,9 +147,8 @@ export function PlayerApp({ routeSlot }: { routeSlot: number | null }) {
   // ---------- Render ----------
   if (phase === 'error') return <WaitingScreen title="Không thể khởi động" sub={err ?? ''} />;
   if (phase === 'boot') return <WaitingScreen title="Đang kết nối giao diện não–máy…" loading />;
-  if (phase === 'pick') return <CharacterPicker onPick={(s) => { setSlot(s); setPhase('key'); }} />;
-  if (phase === 'key' && slot) {
-    return <InviteKeyScreen character={charBySlot(slot)} initialCode={lastCode()} error={err} busy={busy} onSubmit={join} />;
+  if (phase === 'join' && client) {
+    return <JoinScreen client={client} initialCode={linkCode ?? lastCode()} initialSlot={slot} error={err} busy={busy} onSubmit={join} />;
   }
   if (!slot || !room || !me) return <WaitingScreen title="Đang tải lượt chơi…" loading />;
 
@@ -227,7 +230,9 @@ export function PlayerApp({ routeSlot }: { routeSlot: number | null }) {
         title="Đã kết nối. Chờ mở phòng chat…"
         sub={`Bạn là [${charBySlot(slot).nick}]. Phòng chat sẽ tự mở khi cả 6 người đã vào (đã vào: ${players.filter((p) => p.holder).length}/6). Đừng lật kịch bản nhé!`}
         loading
-      />
+      >
+        <button onClick={() => leave(null)} className="mt-8 text-xs text-white/50 underline">Chọn nhầm nhân vật? Đổi vai</button>
+      </WaitingScreen>
     );
   }
   if (!progress.name_ok) {

@@ -1,5 +1,5 @@
 'use client';
-import Link from 'next/link';
+import { ShareRoom } from './ShareRoom';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { DmApi } from '@/lib/dmApi';
@@ -52,13 +52,7 @@ export function PlayersPanel({ api, room, players, dmKey }: { api: DmApi; dmKey:
 
   return (
     <div className="space-y-3 px-4 pb-24 pt-4">
-      <div className="dm-card flex items-center justify-between px-4 py-3">
-        <div>
-          <p className="text-xs text-[var(--dm-mute)]">Mã khóa lời mời</p>
-          <p className="font-mono text-3xl font-bold tracking-[0.2em] text-[var(--dm-pink)]">{room.invite_code}</p>
-        </div>
-        <Link href="/dm/qr" target="_blank" className="rounded-lg border border-[var(--dm-line)] px-3 py-2 text-sm">In mã QR</Link>
-      </div>
+      <ShareRoom code={room.invite_code} compact />
       <ControlLink roomId={room.id} dmKey={dmKey} />
 
       {CHARACTERS.map((c) => {

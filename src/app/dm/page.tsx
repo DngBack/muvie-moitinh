@@ -69,7 +69,6 @@ export default function DmHome() {
           <p className="text-xs text-[var(--dm-mute)]">Thiên Hy Niên 2.0</p>
           <h1 className="text-2xl font-bold">Người dẫn trò</h1>
         </div>
-        <Link href="/dm/qr" className="text-sm text-[var(--dm-pink)] underline">In mã QR</Link>
       </div>
 
       <div className="dm-card mt-5 p-4">
@@ -79,7 +78,7 @@ export default function DmHome() {
           <button onClick={create} disabled={busy} className="shrink-0 rounded-lg bg-[var(--dm-pink)] px-4 py-2 font-semibold text-white disabled:opacity-60">{busy ? '…' : 'Tạo'}</button>
         </div>
         <p className="mt-2 text-xs text-[var(--dm-mute)]">
-          App sinh mã khóa lời mời 8 số cho người chơi. Không cần tài khoản — máy này tự nhớ các lượt chơi bạn tạo.
+          App sinh mã phòng 8 số — gửi cho người chơi, họ nhập mã và chọn nhân vật là vào. Không cần tài khoản — máy này tự nhớ các lượt chơi bạn tạo.
           Mã có hiệu lực 12 giờ, dữ liệu tự xóa sau 2 ngày.
         </p>
         {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
