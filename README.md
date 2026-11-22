@@ -2,7 +2,7 @@
 
 Web app đồng hành cho kịch bản 《Mối Tình Đẫm Máu》, thay thế “ứng dụng nhỏ” trong Sổ tay người dẫn trò.
 
-- **Người chơi** (điện thoại): quét QR → nhập mã khóa lời mời → phòng chat OICQ “Tinh Anh Thiên Hy” → mật khẩu nhật ký → Lượt chơi thứ ba (Giao diện 1–6, câu hỏi bảo mật, Chương cuối) → màn Kết cục lưu được ảnh.
+- **Người chơi** (điện thoại): mở trang web → nhập mã phòng + chọn nhân vật → phòng chat OICQ “Tinh Anh Thiên Hy” → mật khẩu nhật ký → Lượt chơi thứ ba (Giao diện 1–6, câu hỏi bảo mật, Chương cuối) → màn Kết cục lưu được ảnh.
 - **Người dẫn trò (DM)**: tạo lượt chơi, Điều khiển giai đoạn (Mở / Chờ mở / Đã mở), Kịch bản dẫn từng bước, Tra cứu đáp án, theo dõi 6 người chơi.
 
 **Không cần tài khoản.** DM bấm “Tạo” là có phòng; người chơi chỉ cần mã khóa. Mã có hiệu lực 12 giờ, dữ liệu tự xóa sau 2 ngày.
@@ -40,9 +40,9 @@ Bản Production lấy từ nhánh `main`.
 
 ## 4. Dẫn một buổi chơi
 
-1. **Trước buổi** (một lần): mở `/dm/qr` → in 6 mã QR nhân vật (dán trang đầu kịch bản) + 1 mã “Thư của Hoan Hoan”. Mã QR cố định theo tên miền.
-2. DM mở `/dm` → **Tạo** → nhận **mã khóa 8 số**, đọc/viết lên bảng cho người chơi.
-3. Người chơi quét QR → nhập mã → **Vào**. Đủ 6 người → phòng chat tự mở.
+1. DM mở `/dm` → **Tạo** → nhận **mã phòng 8 số**.
+2. Gửi mã cho người chơi: bấm **Chia sẻ lời mời** (gửi link qua Zalo/Messenger — mã tự điền sẵn), hoặc cho quét QR trên màn hình DM, hoặc đọc mã.
+3. Người chơi mở trang chủ → nhập mã → **chọn nhân vật** (biệt danh in trên kịch bản) → **Vào**. Đủ 6 người → phòng chat tự mở.
 4. Tab **Kịch bản** đi theo từng bước, có nút **Mở** giao diện ngay trong bước. Tab **Chủ trì** là bảng điều khiển giai đoạn; nếu còn người chưa xong, app hỏi “【…】 vẫn chưa hoàn thành, có tiếp tục không?”.
 5. Cuối: **Kết cục** → *Tắt trò chơi* / *Tiếp tục trò chơi*.
 6. Xong: tab **Lượt chơi** → **Đóng phòng**.
@@ -51,7 +51,7 @@ Nhạc/video: chưa có file trong app — DM phát từ thiết bị riêng; ta
 
 ### Thoát ra / vào lại
 
-- **Người chơi**: thoát trình duyệt, khóa màn hình, mất mạng… mở lại link/QR là về đúng chỗ. Đổi điện thoại: quét QR + nhập lại mã → lấy lại vai, tiến độ giữ nguyên (máy cũ tự bị đẩy ra).
+- **Người chơi**: thoát trình duyệt, khóa màn hình, mất mạng… mở lại trang web là về đúng chỗ. Đổi điện thoại / xóa trình duyệt: nhập lại mã phòng + chọn đúng nhân vật → lấy lại vai, tiến độ giữ nguyên (máy cũ tự bị đẩy ra).
 - **DM**: máy đã tạo phòng tự nhớ phòng — mở `/dm` → **Tiếp tục**. Muốn điều khiển từ máy khác: tab **Lượt chơi** → **Link điều khiển** → mở link đó trên máy kia. Không gửi link này cho người chơi.
 - Người chơi kẹt: tab **Lượt chơi** → *Mở khóa: …*, *Giải phóng thiết bị* hoặc *Xóa tiến độ*.
 
