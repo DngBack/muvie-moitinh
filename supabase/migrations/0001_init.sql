@@ -206,3 +206,6 @@ grant execute on function public.save_progress(uuid, int, uuid, jsonb)      to a
 -- ---------- Realtime ----------
 alter publication supabase_realtime add table public.rooms;
 alter publication supabase_realtime add table public.room_players;
+
+-- Bắt API (PostgREST) nạp lại danh sách hàm/bảng ngay, tránh lỗi "Could not find the function … in the schema cache"
+notify pgrst, 'reload schema';
